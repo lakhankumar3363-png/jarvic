@@ -1,0 +1,31 @@
+recognition.onresult = async (event) => {
+            const command = event.results[0][0].transcript;
+            appendMessage("You", command, "msg-user");
+            setVisualState("thinking", "Processing query...", "#ffaa00");
+
+            // Send command to Flask server
+            try {
+                const res = await fetch("/process", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ command: command })
+                });
+                const data = await res.json();
+                
+                // Speak and show the text response
+                appendMessage("Jarvis", data.reply, "msg-jarvis");
+                speakResponse(data.reply);
+                
+                // Execute Web Actions (like opening YouTube)
+                if (data.action === "open_url" && data.url) {
+                    setTimeout(() => {
+                        window.open(data.url, "_blank");
+                    }, 1500); // Wait 1.5 seconds so Jarvis can finish speaking first
+                }
+                
+            } catch (err) {
+                appendMessage("System", "Error communicating with server.", "msg-user");
+                setVisualState("", "Standby", "#8b949e");
+                micBtn.disabled = false;
+            }
+        };
