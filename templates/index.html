@@ -1,4 +1,168 @@
-recognition.onresult = async (event) => {
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jarvis Web Assistant</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #0e1117;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 28px;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+            color: #58a6ff;
+        }
+
+        #status {
+            font-size: 15px;
+            color: #8b949e;
+            margin-bottom: 25px;
+            transition: color 0.3s ease;
+        }
+
+        /* Animated Pulsing Ring */
+        .ring-wrapper {
+            position: relative;
+            width: 180px;
+            height: 180px;
+            margin: 0 auto 30px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .ring {
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            border: 4px solid #30363d;
+            box-shadow: 0 0 15px rgba(88, 166, 255, 0.1);
+            transition: all 0.4s ease;
+        }
+
+        .ring.listening {
+            border-color: #00d2ff;
+            box-shadow: 0 0 35px #00d2ff;
+            animation: pulse 1.2s infinite alternate;
+        }
+
+        .ring.thinking {
+            border-color: #ffaa00;
+            box-shadow: 0 0 35px #ffaa00;
+            animation: spin 1s infinite linear;
+        }
+
+        .ring.speaking {
+            border-color: #2ea043;
+            box-shadow: 0 0 35px #2ea043;
+            animation: pulse 0.8s infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            100% { transform: scale(1.1); opacity: 1; }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .btn-mic {
+            background-color: #238636;
+            color: white;
+            border: none;
+            padding: 12px 28px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 25px;
+            cursor: pointer;
+            margin-bottom: 25px;
+            transition: background-color 0.2s ease;
+        }
+
+        .btn-mic:hover {
+            background-color: #2ea043;
+        }
+
+        .chat-box {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 16px;
+            height: 240px;
+            overflow-y: auto;
+            text-align: left;
+            font-size: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .msg-user { color: #58a6ff; }
+        .msg-jarvis { color: #7ee787; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>JARVIS</h1>
+    <p id="status">Click "Talk to Jarvis" to begin</p>
+
+    <div class="ring-wrapper" onclick="startListening()">
+        <div id="visualizer" class="ring"></div>
+    </div>
+
+    <button id="micBtn" class="btn-mic" onclick="startListening()">Talk to Jarvis</button>
+
+    <div id="chatBox" class="chat-box"></div>
+</div>
+
+<script>
+    const statusText = document.getElementById("status");
+    const visualizer = document.getElementById("visualizer");
+    const chatBox = document.getElementById("chatBox");
+    const micBtn = document.getElementById("micBtn");
+
+    // Check browser Speech Recognition support
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+
+        recognition.onstart = () => {
+            setVisualState("listening", "Listening to your voice...", "#00d2ff");
+            micBtn.disabled = true;
+        };
+
+        recognition.onresult = async (event) => {
             const command = event.results[0][0].transcript;
             appendMessage("You", command, "msg-user");
             setVisualState("thinking", "Processing query...", "#ffaa00");
@@ -29,3 +193,59 @@ recognition.onresult = async (event) => {
                 micBtn.disabled = false;
             }
         };
+
+        recognition.onerror = (e) => {
+            setVisualState("", "Standby", "#8b949e");
+            micBtn.disabled = false;
+        };
+
+        recognition.onend = () => {
+            micBtn.disabled = false;
+        };
+    } else {
+        statusText.innerText = "Speech Recognition not supported in this browser. Please use Google Chrome.";
+    }
+
+    function startListening() {
+        if (recognition) {
+            recognition.start();
+        }
+    }
+
+    function speakResponse(text) {
+        if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+
+            utterance.onstart = () => {
+                setVisualState("speaking", "Jarvis is speaking...", "#2ea043");
+            };
+
+            utterance.onend = () => {
+                setVisualState("", "Standby (Click to speak)", "#8b949e");
+            };
+
+            window.speechSynthesis.speak(utterance);
+        } else {
+            setVisualState("", "Standby (Click to speak)", "#8b949e");
+        }
+    }
+
+    function setVisualState(className, text, color) {
+        visualizer.className = "ring " + className;
+        statusText.innerText = text;
+        statusText.style.color = color;
+    }
+
+    function appendMessage(sender, text, className) {
+        const p = document.createElement("p");
+        p.className = className;
+        p.innerHTML = `<strong>${sender}:</strong> ${text}`;
+        chatBox.appendChild(p);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+</script>
+
+</body>
+</html>
